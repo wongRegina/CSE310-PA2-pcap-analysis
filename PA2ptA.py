@@ -1,3 +1,4 @@
+import collections
 import struct
 import dpkt
 
@@ -38,7 +39,7 @@ class Packet:
     def __str__(self):
         return "Source IP: %s, Destination IP: %s, Source Port: %s, " "Destination Port: " \
                "%s, Sequence number: %s, Acknowledgement number: %s, Ack: %s, Syn: %s, Fin: %s, Receive Window " \
-               "Size: %s " % (struct.unpack('>BBBB', self.sourceIP[:]), str(int.from_bytes(self.destIP, "big")),
+               "Size: %s " % (struct.unpack('>BBBB', self.sourceIP[:]), struct.unpack('>BBBB', self.destIP[:]),
                               str(int.from_bytes(self.sourcePort, "big")), str(int.from_bytes(self.destPort, "big")),
                               str(int.from_bytes(self.seqNum, "big")), str(int.from_bytes(self.ackNum, "big")),
                               self.ack, self.syn, self.fin, str(int.from_bytes(self.windSizeValue, "big")))
@@ -59,16 +60,6 @@ def find_packets(pcap):  # Goes read each element in the pcap file
     return packets
 
 
-def find_TCP_connections(packets):
-    num_of_TCP_connections = 0
-    for packet in packets:
-        # print(packet.seqNum, packet.ackNum)
-        if packet.syn == 1 and packet.ack == 1:
-            num_of_TCP_connections += 1
-    # print(num_of_TCP_connections)
-    return num_of_TCP_connections
-
-
 def find_flows(packets):
     list_of_flows = []
     receiver_window_size = -1
@@ -77,7 +68,8 @@ def find_flows(packets):
             a = [packet]
             packet.receiver_window_size = int.from_bytes(packet.TCP[len(packet.TCP) - 1:len(packet.TCP)], "big")
             receiver_window_size = packet.receiver_window_size
-            list_of_flows.insert(0, a)
+            # list_of_flows.insert(0, a)
+            list_of_flows.append(a)
         else:
             for flow in list_of_flows:
                 port = flow[0].sourcePort
@@ -98,27 +90,41 @@ def going_through_flow(flow):
     last_congestion_window = 1
     congestion_window_size = 0
     congestion_window_sizes = []
+    triple_duk_ack = 0
+    timeout = 0
+    last_ack_num = 0
+    second_to_last_ack_num = 0
+    last_seq_num = int.from_bytes(flow[0].seqNum, "big")
     for packet in flow:
         if packet.sourceIP == sender and packet.destIP == receiver:
             congestion_window_size += 1
             if packet.syn == 0 and packet.ack == 1 and counter < 2:
                 if packet.push == 0:
                     counter += 1
-                    print(packet.print())
-                total_packets += len(packet.payload) + packet.header_length
+                    print("\t", packet.print())
+            if last_seq_num > int.from_bytes(packet.seqNum, "big"):
+                if last_ack_num == second_to_last_ack_num:
+                    triple_duk_ack += 1
+                else:
+                    timeout += 1
             else:
-                total_packets += len(packet.payload) + packet.header_length
+                last_seq_num = int.from_bytes(packet.seqNum, "big")
+            total_packets += len(packet.payload) + packet.header_length
         elif packet.sourceIP == receiver and packet.destIP == sender:
             last_congestion_window += -1
+            second_to_last_ack_num = last_ack_num
+            last_ack_num = int.from_bytes(packet.ackNum, "big")
             if congestion_window_size > 0 and last_congestion_window == 0:
                 last_congestion_window = congestion_window_size
                 congestion_window_sizes.append(congestion_window_size)
                 congestion_window_size = 0
     print("Sender Throughput: ", str(total_packets / total_time), " Bytes/sec")
     if len(congestion_window_sizes) < 6:
-        print("Congestion window size:", congestion_window_sizes[1:], "\n")
+        print("Congestion window size:", congestion_window_sizes[1:])
     else:
-        print("Congestion window size:", congestion_window_sizes[1: 6], "\n")
+        print("Congestion window size:", congestion_window_sizes[1: 6])
+    print("Retransmission occurred due to triple duplicate ack: ", triple_duk_ack)
+    print("Retransmission occurred due to timeout: ", timeout, "\n")
 
 
 def main():
