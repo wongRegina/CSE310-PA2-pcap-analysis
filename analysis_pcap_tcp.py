@@ -54,7 +54,8 @@ def find_packets(pcap):  # Goes read each element in the pcap file
     packets = []
     for timestamp, buffer in pcap:
         IP = buffer[14:34]
-        if int.from_bytes(IP[12:16], "big") == 0x82f5910c or int.from_bytes(IP[16:20], "big") == 0x82f5910c:
+        if IP[9] == 6 and int.from_bytes(IP[12:16], "big") == 0x82f5910c or int.from_bytes(
+                IP[16:20], "big") == 0x82f5910c:
             packet = Packet(timestamp, buffer)
             packets.append(packet)
     return packets
@@ -69,7 +70,6 @@ def find_flows(packets):
             packet.receiver_window_size = int.from_bytes(packet.TCP[len(packet.TCP) - 1:len(packet.TCP)], "big")
             receiver_window_size = packet.receiver_window_size
             list_of_flows.insert(0, a)
-            # list_of_flows.append(a)
         else:
             for flow in list_of_flows:
                 port = flow[0].sourcePort
@@ -116,7 +116,7 @@ def going_through_flow(flow):
             second_to_last_ack_num = last_ack_num
             last_ack_num = int.from_bytes(packet.ackNum, "big")
             if 0 <= ack_counter < 2 and packet.ack == 1 and packet.syn == 0:
-                print("\t\t ACK", packet.print())
+                print("\t\t ACK:", packet.print())
             ack_counter += 1
             if congestion_window_size > 0 and last_congestion_window == 0:
                 last_congestion_window = congestion_window_size
