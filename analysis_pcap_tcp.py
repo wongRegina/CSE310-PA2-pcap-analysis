@@ -2,6 +2,7 @@ import struct
 import dpkt
 import sys
 
+
 class Packet:
     def __init__(self, timestamp, buffer):
         self.buffer = buffer
