@@ -1,7 +1,6 @@
-import collections
 import struct
 import dpkt
-
+import sys
 
 class Packet:
     def __init__(self, timestamp, buffer):
@@ -68,8 +67,8 @@ def find_flows(packets):
             a = [packet]
             packet.receiver_window_size = int.from_bytes(packet.TCP[len(packet.TCP) - 1:len(packet.TCP)], "big")
             receiver_window_size = packet.receiver_window_size
-            # list_of_flows.insert(0, a)
-            list_of_flows.append(a)
+            list_of_flows.insert(0, a)
+            # list_of_flows.append(a)
         else:
             for flow in list_of_flows:
                 port = flow[0].sourcePort
@@ -87,6 +86,7 @@ def going_through_flow(flow):
     total_time = flow[len(flow) - 1].timestamp - flow[0].timestamp
     total_packets = 0
     counter = 0
+    ack_counter = -1
     last_congestion_window = 1
     congestion_window_size = 0
     congestion_window_sizes = []
@@ -114,6 +114,9 @@ def going_through_flow(flow):
             last_congestion_window += -1
             second_to_last_ack_num = last_ack_num
             last_ack_num = int.from_bytes(packet.ackNum, "big")
+            if 0 <= ack_counter < 2 and packet.ack == 1 and packet.syn == 0:
+                print("\t\t ACK", packet.print())
+            ack_counter += 1
             if congestion_window_size > 0 and last_congestion_window == 0:
                 last_congestion_window = congestion_window_size
                 congestion_window_sizes.append(congestion_window_size)
@@ -127,8 +130,8 @@ def going_through_flow(flow):
     print("Retransmission occurred due to timeout: ", timeout, "\n")
 
 
-def main():
-    file = open("assignment2.pcap", "r+b")  # opens the file and is read only and binary
+def main(pcap_file):
+    file = open(pcap_file, "r+b")  # opens the file and is read only and binary
     pcap = dpkt.pcap.Reader(file)
     packets = find_packets(pcap)
     list_of_flows = find_flows(packets)
@@ -138,4 +141,8 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    name = sys.argv[1]
+    if ".pcap" in name:
+        main(name)
+    else:
+        print("Not a valid file! (need a pcap file)")
