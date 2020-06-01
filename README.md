@@ -1,5 +1,6 @@
 # CSE310-PA2-pcap-analysis
-A program analysis PCAP TCP that analyzes a PCAP file to characterize the TCP flows in the trace
+A program analysis PCAP TCP that analyzes a PCAP file to characterize the TCP flows in the trace.
+
 analysis_pcap_tcp is a version of TCPDump. The analysis_pcap_tcp parses a pcap file and finds all the packets in the TCP.
 
 ## Installation
